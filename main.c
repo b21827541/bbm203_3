@@ -42,10 +42,14 @@ void PrintChromosomes(chromosome* head_chromosome){
     while(current_chromosome){
         gene* current_gene = current_chromosome->head_gene;
         while(current_gene){
-            printf("%d ",current_gene->val);
+            if(current_gene->next == NULL){
+                printf("%d ", current_gene->val);
+                break;
+            }
+            printf("%d:",current_gene->val);
             current_gene = current_gene->next;
         }
-        printf("%d  %0.3lf ", current_chromosome->fitness, current_chromosome->rank);
+        printf(" -> %d", current_chromosome->fitness);
         printf("\n");
         current_chromosome = current_chromosome->next;
     }
@@ -143,7 +147,7 @@ int FitnessWorst(chromosome* head_chromosome){
         }
         worst = current_chromosome->fitness;
         current_chromosome = current_chromosome->next;
-        current_chromosome = current_chromosome->next;
+        //current_chromosome = current_chromosome->next;
     }
     return worst;
 }
@@ -295,12 +299,13 @@ void Evolve(int a, int b, int x, int y, chromosome* head_chromosome){
         temp = first_gene->val;
         first_gene->val = second_gene->val;
         second_gene->val = temp;
+        first_gene = first_gene->next;
+        second_gene = second_gene->next;
         j++;
     }
-    printf("%s \n","asdasfa");
 
 }
-void Mutate(int a, int b, int z, chromosome* head_chromosome){
+void Mutate(int a, int b, int z, chromosome* head_chromosome, int prob_size){
     int i=1,k=1,j=1;
     chromosome* first = head_chromosome;
     chromosome* second = head_chromosome;
@@ -323,7 +328,6 @@ void Mutate(int a, int b, int z, chromosome* head_chromosome){
         second_gene = second_gene->next;
         j++;
     }
-    printf("%s \n","asdasfa");
 
     if(first_gene->val == 1)
         first_gene->val = 0;
@@ -333,17 +337,57 @@ void Mutate(int a, int b, int z, chromosome* head_chromosome){
         second_gene->val = 0;
     else
         second_gene->val =1;
+    first->fitness = FitnessCalculation(first,prob_size);
+    second->fitness = FitnessCalculation(second,prob_size);
+}
 
+void PrintBestChromosome(chromosome* best_chromosome){
+    chromosome* curr = best_chromosome;
+    gene* curr_gene = curr->head_gene;
+    printf("Best chromosome found so far: ");
+    while(curr_gene){
+        if(curr_gene->next == NULL) {
+            printf("%d", curr_gene->val);
+            break;
+        }
+        printf("%d:", curr_gene->val);
+        curr_gene = curr_gene->next;
+    }
+    printf(" -> %d", curr->fitness);
+}
+
+chromosome* BestChromosome(int generation,chromosome* head, chromosome* best){
+    chromosome* curr = head;
+    gene* curr_gene = curr->head_gene;
+    if(!generation){
+        while(curr_gene){
+            InsertGene(best,curr_gene->val);
+            curr_gene=curr_gene->next;
+        }
+        best->fitness = curr->fitness;
+        best->rank = curr->rank;
+        return best;
+    }
+    if(curr->fitness < best->fitness){
+        gene* new_gene = best->head_gene;
+        while(curr_gene){
+            new_gene->val = curr_gene->val;
+            new_gene=new_gene->next;
+            curr_gene=curr_gene->next;
+        }
+        best->fitness = curr->fitness;
+        best->rank = curr->rank;
+    }
+    return best;
 }
 
 int main(int argc, char* argv[]) {
-    int i, a, b, x, y, z;
+    int i, a, b, x, y, z, generation = 0;
     int name = 1;
     char* input_lines = file_to_string("population"),* selection = file_to_string("selection"),* xover = file_to_string("xover"),* mutate = file_to_string("mutate");
     char* rest = input_lines,* selection_rest = selection,* xover_rest = xover,* mutate_rest = mutate;
     char* rest2;
     char* line;
-    FILE* output = fopen("output", "w+");
     char *order;
     char *ptr;
     long num;
@@ -384,46 +428,71 @@ int main(int argc, char* argv[]) {
     Sort(&head_chromosome);
 
     chromosome* best_chromosome = NewChromosome();
-    best_chromosome->head_gene = head_chromosome->head_gene;
-    best_chromosome->fitness = head_chromosome->fitness;
-    best_chromosome->rank = head_chromosome->rank;
-
+    //Evolving and Mutating the chromosomes for every generation
     while ((line_selection = strtok_r(selection_rest, "\r\n", &selection_rest))) {
+        if(generation == 0){
+            printf("\n");
+            printf("Generation: %d \n", generation);
+            PrintChromosomes(head_chromosome);
+
+            best_chromosome = BestChromosome(generation,head_chromosome, best_chromosome);
+            PrintBestChromosome(best_chromosome);
+            generation++;
+        }
         selection_rest2 = line_selection;
         line_xover = strtok_r(xover_rest, "\r\n", &xover_rest);
         x = atoi(strtok_r(line_xover, ":", &line_xover));
         y = atoi(strtok_r(line_xover, "\r\n", &line_xover));
-        printf("%d %d\n", x,y);
         line_mutate = strtok_r(mutate_rest, "\r\n", &mutate_rest);
         z = atoi(line_mutate);
-        printf("%d \n", z);
         while((order2 = strtok_r(selection_rest2, " ", &selection_rest2))) {
              a = atoi(strtok_r(order2,":",&order2));
              b = atoi(strtok_r(order2,":",&order2));
-             printf("%d %d\n",a,b);
              Evolve(a,b,x,y,head_chromosome);
-             Mutate(a,b,z,head_chromosome);
+             Mutate(a,b,z,head_chromosome,prob_size);
         }
+        printf("\n");
+        printf("Generation: %d \n", generation);
+        best_fitness = FitnessBest(head_chromosome);
+        worst_fitness = FitnessWorst(head_chromosome);
+        RankCalculation(head_chromosome, (double) best_fitness, (double) worst_fitness);
+        Sort(&head_chromosome);
+        PrintChromosomes(head_chromosome);
+
+        best_chromosome = BestChromosome(generation,head_chromosome, best_chromosome);
+        PrintBestChromosome(best_chromosome);
+        generation++;
     }
 
 
     printf("\n");
-    PrintChromosomes(head_chromosome);
 
     //free
+    chromosome* tmp ;
     while(head_chromosome){
+        tmp = head_chromosome;
         gene* gene1 = head_chromosome->head_gene;
-        while(gene1){
-            free(gene1);
+        gene* temp ;
+        while(gene1 != NULL){
+            temp = gene1;
             gene1 = gene1->next;
+            free(temp);
         }
-        free(head_chromosome);
         head_chromosome = head_chromosome->next;
+        free(tmp);
+        //free(head_chromosome);
     }
     free(input_lines);
     free(selection);
     free(xover);
     free(mutate);
-
+    gene* gene2 = best_chromosome->head_gene;
+    gene* temp2;
+    while(gene2 != NULL){
+        temp2 = gene2;
+        gene2 = gene2->next;
+        free(temp2);
+    }
+    free(best_chromosome);
     return 0;
 }
